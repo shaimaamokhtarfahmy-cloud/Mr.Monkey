@@ -1,0 +1,651 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>لعبة مغامرة القرد - أزمنة اللغة الإنجليزية</title>
+<style>
+  * { box-sizing: border-box; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; user-select: none; }
+  body { margin: 0; background: linear-gradient(180deg, #1b4332 0%, #2d6a4f 60%, #40916c 100%); color: #fff; overflow-x: hidden; min-height: 100vh; display: flex; flex-direction: column; align-items: center; }
+  header { width: 100%; background: rgba(0,0,0,0.4); padding: 10px 20px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; border-bottom: 3px solid #ffb703; }
+  .stats { display: flex; gap: 15px; font-size: 1.1rem; font-weight: bold; align-items: center; }
+  .stat-box { background: rgba(255,255,255,0.15); padding: 6px 14px; border-radius: 20px; }
+  button { cursor: pointer; border: none; border-radius: 10px; padding: 8px 16px; font-weight: bold; font-size: 1rem; transition: transform 0.15s, background 0.2s; }
+  button:hover { transform: scale(1.05); }
+  .btn-primary { background: #ffb703; color: #000; }
+  .btn-secondary { background: #8ecae6; color: #000; }
+  .btn-danger { background: #e63946; color: #fff; }
+
+  #game-container { position: relative; width: 95%; max-width: 900px; height: 420px; background: radial-gradient(circle at 50% 30%, #52b788, #1b4332); margin: 20px auto; border: 4px solid #d4a373; border-radius: 18px; overflow: hidden; box-shadow: 0 10px 25px rgba(0,0,0,0.5); }
+  canvas { display: block; width: 100%; height: 100%; }
+
+  .controls-hint { text-align: center; margin-bottom: 10px; font-size: 0.95rem; color: #d8f3dc; }
+  .mobile-controls { display: flex; gap: 15px; margin-bottom: 15px; }
+  .ctrl-btn { width: 60px; height: 50px; font-size: 1.4rem; background: rgba(255,255,255,0.25); color: #fff; border-radius: 12px; }
+
+  /* Modals */
+  .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.75); display: none; justify-content: center; align-items: center; z-index: 100; padding: 15px; }
+  .modal { background: #fefae0; color: #1b4332; width: 100%; max-width: 620px; border-radius: 20px; padding: 25px; text-align: center; border: 5px solid #ffb703; box-shadow: 0 10px 30px rgba(0,0,0,0.6); position: relative; }
+  .timer-bar { width: 100%; height: 12px; background: #ddd; border-radius: 6px; overflow: hidden; margin-bottom: 12px; }
+  .timer-fill { height: 100%; width: 100%; background: #2a9d8f; transition: width 1s linear, background 0.3s; }
+  .badge-row { display: flex; justify-content: space-between; margin-bottom: 10px; font-size: 0.9rem; font-weight: bold; color: #555; }
+  .question-text { direction: ltr; font-size: 1.3rem; font-weight: bold; margin: 15px 0; color: #003049; background: #e9edc9; padding: 15px; border-radius: 12px; }
+  .options-grid { direction: ltr; display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 15px; }
+  .opt-btn { background: #fff; border: 2px solid #2d6a4f; color: #1b4332; padding: 12px; font-size: 1.05rem; border-radius: 12px; }
+  .opt-btn:hover { background: #d8f3dc; }
+
+  /* Feedback & Gift Box */
+  .reaction-area { margin-top: 15px; padding: 15px; border-radius: 12px; background: #faedcd; }
+  .big-emoji { font-size: 4rem; display: inline-block; animation: pop 0.5s ease; cursor: pointer; }
+  @keyframes pop { 0% { transform: scale(0.2); } 80% { transform: scale(1.2); } 100% { transform: scale(1); } }
+  @keyframes shake { 0%, 100% { transform: translateX(0); } 20%, 60% { transform: translateX(-12px); } 40%, 80% { transform: translateX(12px); } }
+  .shake { animation: shake 0.5s ease; }
+  .hint-box { background: #fff3cd; color: #856404; border: 2px solid #ffeeba; padding: 10px; border-radius: 10px; margin-top: 10px; font-size: 0.95rem; }
+
+  /* Leaderboard */
+  table { width: 100%; border-collapse: collapse; margin-top: 15px; }
+  th, td { padding: 10px; border-bottom: 1px solid #ccc; text-align: center; }
+  th { background: #ffb703; color: #000; }
+  input[type="text"] { padding: 10px; width: 70%; border-radius: 8px; border: 2px solid #2d6a4f; font-size: 1rem; margin-bottom: 10px; }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="stats">
+    <div class="stat-box">السؤال: <span id="q-counter">0</span> / 50</div>
+    <div class="stat-box">النقاط: <span id="score-val">0</span> ⭐</div>
+    <div class="stat-box">الفواكه: <span id="fruits-tray"></span></div>
+  </div>
+  <div style="display:flex; gap:10px;">
+    <button class="btn-secondary" onclick="toggleAudio()" id="audio-btn">🔊 تشغيل صوت الغابة</button>
+    <button class="btn-primary" onclick="openLeaderboard()">🏆 لوحة الشرف</button>
+  </div>
+</header>
+
+<div id="game-container">
+  <canvas id="gameCanvas" width="900" height="420"></canvas>
+</div>
+
+<div class="controls-hint">استخدم أسهم لوحة المفاتيح (⬅️ ⬆️ ➡️) أو الأزرار أدناه للقفز على الأشكال الهندسية والإمساك بالموزة 🍌</div>
+<div class="mobile-controls">
+  <button class="ctrl-btn" onmousedown="keys.right=true" onmouseup="keys.right=false" ontouchstart="keys.right=true" ontouchend="keys.right=false">➡️</button>
+  <button class="ctrl-btn" onmousedown="jump()" ontouchstart="jump()">⬆️</button>
+  <button class="ctrl-btn" onmousedown="keys.left=true" onmouseup="keys.left=false" ontouchstart="keys.left=true" ontouchend="keys.left=false">⬅️</button>
+</div>
+
+<!-- Question & Feedback Modal -->
+<div class="modal-overlay" id="q-modal">
+  <div class="modal" id="q-modal-box">
+    <div id="question-view">
+      <div class="badge-row">
+        <span id="q-level">المستوى: A1</span>
+        <span id="q-tense">الزمن: Present Simple</span>
+        <span id="q-timer-text">⏱️ 20 ثانية</span>
+      </div>
+      <div class="timer-bar"><div class="timer-fill" id="timer-fill"></div></div>
+      <div class="question-text" id="q-text"></div>
+      <div class="options-grid" id="q-options"></div>
+    </div>
+
+    <div id="feedback-view" style="display:none;">
+      <h3 id="fb-title"></h3>
+      <div class="reaction-area" id="fb-reaction"></div>
+      <div class="hint-box" id="fb-hint" style="display:none;"></div>
+      <button class="btn-primary" id="next-btn" style="margin-top:15px; display:none;" onclick="closeQuestionModal()">استمرار المغامرة 🐒</button>
+    </div>
+  </div>
+</div>
+
+<!-- Leaderboard Modal -->
+<div class="modal-overlay" id="lb-modal">
+  <div class="modal">
+    <h2>🏆 لوحة الشرف للمتصدرين</h2>
+    <div id="save-score-form">
+      <input type="text" id="player-name" placeholder="اكتب اسمك لتسجيل نقاطك الحالية..." />
+      <button class="btn-primary" onclick="saveScore()">حفظ النتيجة</button>
+    </div>
+    <table>
+      <thead><tr><th>الترتيب</th><th>اسم الطالب</th><th>النقاط</th><th>الأسئلة المجابة</th></tr></thead>
+      <tbody id="lb-body"></tbody>
+    </table>
+    <div style="margin-top:15px; display:flex; justify-content:center; gap:10px;">
+      <button class="btn-secondary" onclick="closeLeaderboard()">إغلاق</button>
+      <button class="btn-danger" onclick="resetGame()">لعبة جديدة 🔄</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ================= 1. المؤثرات الصوتية (Web Audio API) =================
+let audioCtx = null;
+let jungleInterval = null;
+let soundEnabled = false;
+
+function initAudio() {
+  if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  if (audioCtx.state === 'suspended') audioCtx.resume();
+}
+
+function toggleAudio() {
+  initAudio();
+  soundEnabled = !soundEnabled;
+  document.getElementById('audio-btn').textContent = soundEnabled ? '🔇 كتم الصوت' : '🔊 تشغيل صوت الغابة';
+  if (soundEnabled) startJungleAmbience();
+  else stopJungleAmbience();
+}
+
+function startJungleAmbience() {
+  stopJungleAmbience();
+  jungleInterval = setInterval(() => {
+    if (!soundEnabled || !audioCtx) return;
+    // زقزقة عصافير الغابة الخلفية
+    const osc = audioCtx.createOscillator();
+    const gain = audioCtx.createGain();
+    osc.type = 'sine';
+    const baseFreq = 1600 + Math.random() * 900;
+    osc.frequency.setValueAtTime(baseFreq, audioCtx.currentTime);
+    osc.frequency.exponentialRampToValueAtTime(baseFreq + 500, audioCtx.currentTime + 0.08);
+    osc.frequency.exponentialRampToValueAtTime(baseFreq - 200, audioCtx.currentTime + 0.18);
+    gain.gain.setValueAtTime(0.03, audioCtx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.2);
+    osc.connect(gain); gain.connect(audioCtx.destination);
+    osc.start(); osc.stop(audioCtx.currentTime + 0.2);
+  }, 1800);
+}
+
+function stopJungleAmbience() {
+  if (jungleInterval) clearInterval(jungleInterval);
+}
+
+function playJumpSound() {
+  if (!soundEnabled || !audioCtx) return;
+  // صوت قفزة القرد (أووه!)
+  const osc = audioCtx.createOscillator();
+  const gain = audioCtx.createGain();
+  osc.type = 'triangle';
+  osc.frequency.setValueAtTime(260, audioCtx.currentTime);
+  osc.frequency.exponentialRampToValueAtTime(580, audioCtx.currentTime + 0.16);
+  gain.gain.setValueAtTime(0.18, audioCtx.currentTime);
+  gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.18);
+  osc.connect(gain); gain.connect(audioCtx.destination);
+  osc.start(); osc.stop(audioCtx.currentTime + 0.18);
+}
+
+function playWinSound() {
+  if (!soundEnabled || !audioCtx) return;
+  [523, 659, 784, 1046].forEach((freq, i) => {
+    const osc = audioCtx.createOscillator();
+    const gain = audioCtx.createGain();
+    osc.type = 'sine';
+    osc.frequency.value = freq;
+    gain.gain.setValueAtTime(0.15, audioCtx.currentTime + i * 0.09);
+    gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + i * 0.09 + 0.2);
+    osc.connect(gain); gain.connect(audioCtx.destination);
+    osc.start(audioCtx.currentTime + i * 0.09);
+    osc.stop(audioCtx.currentTime + i * 0.09 + 0.2);
+  });
+}
+
+function playMonkeyScream() {
+  initAudio(); // صراخ القرد يعمل تلقائياً عند الإجابة الخاطئة
+  const now = audioCtx.currentTime;
+  for (let i = 0; i < 3; i++) {
+    const start = now + i * 0.24;
+    const osc = audioCtx.createOscillator();
+    const mod = audioCtx.createOscillator();
+    const modGain = audioCtx.createGain();
+    const gain = audioCtx.createGain();
+
+    osc.type = 'sawtooth';
+    osc.frequency.setValueAtTime(850, start);
+    osc.frequency.linearRampToValueAtTime(1450, start + 0.1);
+    osc.frequency.linearRampToValueAtTime(700, start + 0.22);
+
+    mod.frequency.value = 45;
+    modGain.gain.value = 180;
+    mod.connect(modGain);
+    modGain.connect(osc.frequency);
+
+    gain.gain.setValueAtTime(0.35, start);
+    gain.gain.exponentialRampToValueAtTime(0.01, start + 0.22);
+
+    osc.connect(gain); gain.connect(audioCtx.destination);
+    osc.start(start); mod.start(start);
+    osc.stop(start + 0.23); mod.stop(start + 0.23);
+  }
+}
+
+// ================= 2. بنك الأسئلة (50 سؤالاً غير مكرر A1 - B2) =================
+const questionsBank = [
+  // 1. Present Simple (6)
+  { lvl:"A1", tense:"Present Simple", q:"She usually ___ a glass of milk before bed.", opts:["drinks","drink","is drinking","drank"], ans:0, hint:"في المضارع البسيط مع (She/He/It) نضيف (s) للفعل في الجملة المثبتة." },
+  { lvl:"A1", tense:"Present Simple", q:"My brothers ___ play video games on school nights.", opts:["doesn't","don't","aren't","didn't"], ans:1, hint:"لنفي المضارع البسيط مع الفاعل الجمع (My brothers) نستخدم (don't + المصدر)." },
+  { lvl:"A1", tense:"Present Simple", q:"___ your father read the newspaper every morning?", opts:["Do","Is","Does","Has"], ans:2, hint:"في سؤال (هل) بالمضارع البسيط مع الفاعل المفرد (your father) نبدأ بـ (Does)." },
+  { lvl:"A2", tense:"Present Simple", q:"Where ___ penguins live in the wild?", opts:["does","do","are","have"], ans:1, hint:"مع أداة الاستفهام والفاعل الجمع (penguins) نستخدم الفعل المساعد (do) في المضارع البسيط." },
+  { lvl:"B1", tense:"Present Simple", q:"The international train ___ from platform 4 at 6:30 PM.", opts:["leave","is leave","leaves","leaving"], ans:2, hint:"جداول المواعيد الثابتة (قطارات/طائرات) تستخدم المضارع البسيط، لذا نختار (leaves)." },
+  { lvl:"B1", tense:"Present Simple", q:"Why ___ he never agree with our team's proposals?", opts:["do","is","does","has"], ans:2, hint:"السؤال عن عادة متكررة مع الفاعل المفرد (he) يتطلب الفعل المساعد (does)." },
+
+  // 2. Present Continuous (6)
+  { lvl:"A1", tense:"Present Continuous", q:"Look! The monkey ___ up the tall coconut tree right now.", opts:["climbs","is climbing","climbed","climb"], ans:1, hint:"كلمة (Look! / right now) تدل على حدث يقع الآن، فنستخدم (am/is/are + verb-ing)." },
+  { lvl:"A1", tense:"Present Continuous", q:"We ___ watching television at the moment; we are studying.", opts:["don't","aren't","isn't","weren't"], ans:1, hint:"في نفي المضارع المستمر مع (We) نستخدم (aren't + verb-ing)." },
+  { lvl:"A2", tense:"Present Continuous", q:"___ the children sleeping in their bedroom right now?", opts:["Do","Are","Have","Were"], ans:1, hint:"السؤال بـ (هل) في المضارع المستمر مع الجمع (the children) يبدأ بـ (Are)." },
+  { lvl:"A2", tense:"Present Continuous", q:"What ___ you cooking in the kitchen? It smells delicious!", opts:["do","are","have","were"], ans:1, hint:"الحدث مستمر أثناء الكلام، لذا بعد أداة الاستفهام (What) نستخدم (are) مع (you)." },
+  { lvl:"B1", tense:"Present Continuous", q:"More and more people ___ electric cars nowadays.", opts:["buys","are buying","bought","has bought"], ans:1, hint:"التغيرات التدريجية المستمرة في الوقت الحاضر (nowadays) تُصاغ بالمضارع المستمر." },
+  { lvl:"B2", tense:"Present Continuous", q:"She ___ always losing her house keys, which really annoys me!", opts:["does","is","has","was"], ans:1, hint:"نستخدم (is/are + always + verb-ing) للتعبير عن الضيق من عادة متكررة في مستوى B2." },
+
+  // 3. Past Simple (6)
+  { lvl:"A1", tense:"Past Simple", q:"Yesterday evening, I ___ my grandparents in the village.", opts:["visit","visited","visiting","have visited"], ans:1, hint:"وجود (Yesterday evening) يحدد وقتاً منتهياً في الماضي البسيط (التصريف الثاني للفعل)." },
+  { lvl:"A1", tense:"Past Simple", q:"They ___ go to the beach last Friday because of the rain.", opts:["don't","weren't","didn't","haven't"], ans:2, hint:"لنفي الماضي البسيط نستخدم (didn't) متبوعة بالفعل في المصدر (go)." },
+  { lvl:"A2", tense:"Past Simple", q:"___ Sara finish her science project two days ago?", opts:["Did","Does","Was","Has"], ans:0, hint:"كلمة (ago) تدل على الماضي البسيط، وفي السؤال بـ (هل) نستخدم (Did + الفاعل + المصدر)." },
+  { lvl:"A2", tense:"Past Simple", q:"When ___ Leonardo da Vinci paint the Mona Lisa?", opts:["was","did","has","had"], ans:1, hint:"للسؤال عن زمن حدوث فعل في الماضي البسيط نستخدم (When + did + الفاعل + المصدر)." },
+  { lvl:"B1", tense:"Past Simple", q:"As soon as the alarm rang, the firefighters ___ to their trucks.", opts:["rush","rushed","were rushing","have rushed"], ans:1, hint:"الأحداث المتتابعة السريعة في الماضي بعد (As soon as) تُصاغ بالماضي البسيط." },
+  { lvl:"B2", tense:"Past Simple", q:"How much ___ that antique wooden clock cost at the auction?", opts:["was","did","had","were"], ans:1, hint:"الفعل الأساسي هنا هو (cost) في المصدر، لذلك نحتاج الفعل المساعد (did) وليس (was)." },
+
+  // 4. Past Continuous (6)
+  { lvl:"A2", tense:"Past Continuous", q:"At 8 o'clock last night, I ___ a documentary about wildlife.", opts:["watched","was watching","am watching","have watched"], ans:1, hint:"تحديد ساعة معينة في الماضي (At 8 o'clock last night) يتطلب الماضي المستمر (was/were + ing)." },
+  { lvl:"A2", tense:"Past Continuous", q:"The students ___ listening when the teacher explained the rule.", opts:["didn't","weren't","aren't","haven't"], ans:1, hint:"لنفي الماضي المستمر مع الجمع (The students) نستخدم (weren't + verb-ing)." },
+  { lvl:"B1", tense:"Past Continuous", q:"___ it snowing heavily when your plane landed in London?", opts:["Did","Was","Is","Has"], ans:1, hint:"حدث كان مستمراً في الماضي عند وقوع حدث آخر (when landed)، فنبدأ بـ (Was)." },
+  { lvl:"B1", tense:"Past Continuous", q:"What ___ you doing when the electricity suddenly went out?", opts:["did","were","are","have"], ans:1, hint:"بعد أداة الاستفهام للسؤال عن حدث كان مستمراً قبل قطعه نستخدم (were + you + verb-ing)." },
+  { lvl:"B1", tense:"Past Continuous", q:"While Omar ___ the ladder, he slipped and hurt his ankle.", opts:["climbed","was climbing","climbs","has climbed"], ans:1, hint:"بعد الرابط (While) يأتي الحدث الطويل في زمن الماضي المستمر (was climbing)." },
+  { lvl:"B2", tense:"Past Continuous", q:"They ___ planning to move abroad, ___ they changed their minds later.", opts:["were / but","did / so","are / because","had / while"], ans:0, hint:"النية السابقة المستمرة تُصاغ بـ (were planning) مع الرابط الاستدراكي (but)." },
+
+  // 5. Present Perfect (6)
+  { lvl:"A2", tense:"Present Perfect", q:"I ___ already read three chapters of this novel.", opts:["am","did","have","was"], ans:2, hint:"كلمة (already) من دلالات المضارع التام (have/has + التصريف الثالث)." },
+  { lvl:"A2", tense:"Present Perfect", q:"Nadia ___ replied to my invitation email yet.", opts:["didn't","isn't","hasn't","haven't"], ans:2, hint:"كلمة (yet) في نهاية الجملة المنفية تتطلب المضارع التام المنفي، ومع المفرد نستخدم (hasn't)." },
+  { lvl:"B1", tense:"Present Perfect", q:"___ you ever ridden a camel across the desert?", opts:["Did","Have","Are","Were"], ans:1, hint:"للسؤال عن خبرات الحياة باستخدام (ever) نستخدم المضارع التام (Have + الفاعل + P.P)." },
+  { lvl:"B1", tense:"Present Perfect", q:"How many countries ___ your cousin visited so far?", opts:["did","has","is","was"], ans:1, hint:"عبارة (so far) تعني (حتى الآن) وتدل على المضارع التام، ومع المفرد نستخدم (has)." },
+  { lvl:"B2", tense:"Present Perfect", q:"This is the most exciting match we ___ seen this season!", opts:["ever","have ever","did ever","are ever"], ans:1, hint:"مع صيغة التفضيل العليا (the most...) نستخدم المضارع التام (have ever + P.P)." },
+  { lvl:"B2", tense:"Present Perfect", q:"Scientists still ___ found a complete cure for that rare virus.", opts:["didn't","haven't","don't","aren't"], ans:1, hint:"مع (still) قبل الفعل المساعد والتصريف الثالث (found) نستخدم النفي في المضارع التام (haven't)." },
+
+  // 6. Present Perfect Continuous (5)
+  { lvl:"B1", tense:"Present Perfect Continuous", q:"It ___ raining continuously since early morning, and the streets are wet.", opts:["is","was","has been","had"], ans:2, hint:"حدث بدأ في الماضي (since) وما زال مستمراً وله أثر حالي يتطلب (has/have been + verb-ing)." },
+  { lvl:"B1", tense:"Present Perfect Continuous", q:"I ___ feeling well lately, so I booked an appointment with the doctor.", opts:["am not","haven't been","didn't","wasn't"], ans:1, hint:"مع كلمة (lately) والفعل المضاف له (ing) نستخدم نفي المضارع التام المستمر (haven't been)." },
+  { lvl:"B1", tense:"Present Perfect Continuous", q:"___ she been practicing the piano for two hours straight?", opts:["Is","Did","Has","Does"], ans:2, hint:"وجود (been practicing) ومدة زمنية (for two hours) مع الفاعل المفرد يتطلب البدء بـ (Has)." },
+  { lvl:"B2", tense:"Present Perfect Continuous", q:"How long ___ the engineers been working on the new bridge design?", opts:["are","did","have","were"], ans:2, hint:"السؤال بـ (How long) مع (been working) والفاعل الجمع يتطلب (have)." },
+  { lvl:"B2", tense:"Present Perfect Continuous", q:"Why are your hands covered in paint? — I ___ redecorating my room all day.", opts:["am","was","have been","had"], ans:2, hint:"لتفسير أثر واضح في الحاضر (يدان ملطختان بالطلاء) لنشاط استمر طوال اليوم نستخدم (have been + ing)." },
+
+  // 7. Future Simple (5)
+  { lvl:"A1", tense:"Future Simple", q:"I think robots ___ do most household chores in 2050.", opts:["are","will","have","did"], ans:1, hint:"للتنبؤ بالمستقبل مع الفعل (I think) نستخدم المستقبل البسيط (will + المصدر)." },
+  { lvl:"A2", tense:"Future Simple", q:"Don't worry, I ___ tell anyone about your secret.", opts:["don't","won't","am not","haven't"], ans:1, hint:"الوعود في المستقبل المنفي تُصاغ باستخدام (won't + المصدر)." },
+  { lvl:"A2", tense:"Future Simple", q:"___ the museum be open to visitors next Monday?", opts:["Does","Is","Will","Has"], ans:2, hint:"وجود المصدر (be) مع علامة المستقبل (next Monday) يتطلب السؤال بـ (Will)." },
+  { lvl:"B1", tense:"Future Simple", q:"What ___ happen if global temperatures continue to rise?", opts:["does","will","is","has"], ans:1, hint:"في الحالة الشرطية الأولى (If + مضارع بسيط)، يكون جواب الشرط أو السؤال عنه بـ (will + المصدر)." },
+  { lvl:"B1", tense:"Future Simple", q:"That bag looks really heavy! Wait a second, I ___ carry it for you.", opts:["carry","am carrying","will","going to"], ans:2, hint:"القرارات السريعة الفورية وعرض المساعدة تُصاغ بـ (will + المصدر)." },
+
+  // 8. Present Simple Passive (5)
+  { lvl:"A2", tense:"Present Simple Passive", q:"Millions of emails ___ sent around the world every minute.", opts:["is","are","were","have"], ans:1, hint:"المبني للمجهول في المضارع البسيط (every minute) مع الجمع يتكون من (are + التصريف الثالث)." },
+  { lvl:"B1", tense:"Present Simple Passive", q:"Coffee ___ grown in cold northern countries like Iceland.", opts:["doesn't","isn't","aren't","wasn't"], ans:1, hint:"القهوة مفعول به غير معدود (مفرد)، وفي المبني للمجهول المنفي بالمضارع نستخدم (isn't + P.P)." },
+  { lvl:"B1", tense:"Present Simple Passive", q:"___ French spoken as an official language in Canada?", opts:["Does","Is","Has","Did"], ans:1, hint:"اللغة الفرنسية مفعول به مفرد، فنسأل في المبني للمجهول بالمضارع بـ (Is + المفعول + P.P)." },
+  { lvl:"B1", tense:"Present Simple Passive", q:"Where ___ the finest olive oil produced in the Mediterranean?", opts:["does","are","is","was"], ans:2, hint:"عبارة (olive oil) غير معدودة تُعامل معاملة المفرد، فنستخدم (is) قبل التصريف الثالث (produced)." },
+  { lvl:"B2", tense:"Present Simple Passive", q:"All passengers ___ required to show their passports at the gate.", opts:["have","are","do","will"], ans:1, hint:"التعليمات والقواعد العامة للمفعول الجمع (passengers) تُصاغ بالمضارع المجهول (are required)." },
+
+  // 9. Past Simple Passive (5)
+  { lvl:"A2", tense:"Past Simple Passive", q:"The telephone ___ invented by Alexander Graham Bell in 1876.", opts:["is","was","were","has"], ans:1, hint:"حدث تاريخي في الماضي (1876) ونائب الفاعل مفرد (The telephone)، فنستخدم (was + P.P)." },
+  { lvl:"B1", tense:"Past Simple Passive", q:"Fortunately, nobody ___ injured during yesterday's storm.", opts:["didn't","was","were","wasn't"], ans:1, hint:"كلمة (nobody) تفيد النفي تلقائياً وتُعامل معاملة المفرد، لذا نختار الفعل المثبت (was) دون نفي مزدوج." },
+  { lvl:"B1", tense:"Past Simple Passive", q:"___ these ancient pyramids built more than four thousand years ago?", opts:["Did","Were","Are","Have"], ans:1, hint:"الأهرامات جمع والزمن ماضٍ (ago)، لذا نسأل في المبني للمجهول بـ (Were + المفعول + P.P)." },
+  { lvl:"B2", tense:"Past Simple Passive", q:"Why ___ the flight canceled at the last minute last night?", opts:["did","was","were","has"], ans:1, hint:"الرحلة (the flight) مفعول مفرد أُلغيت الليلة الماضية، فنستخدم (was) قبل التصريف الثالث (canceled)." },
+  { lvl:"B2", tense:"Past Simple Passive", q:"The stolen paintings ___ hidden inside an old warehouse before the police found them.", opts:["was","were","did","are"], ans:1, hint:"اللوحات المسروقة جمع في سياق الماضي، فتأخذ صيغة المبني للمجهول (were hidden)." }
+];
+
+// ================= 3. إعدادات اللعبة والحركة على Canvas =================
+const canvas = document.getElementById('gameCanvas');
+const ctx = canvas.getContext('2d');
+
+let gameQueue = [];
+let currentQIndex = 0;
+let score = 0;
+let collectedFruits = [];
+let gamePaused = false;
+let timerInterval = null;
+let timeLeft = 20;
+
+const keys = { left: false, right: false };
+
+const monkey = { x: 60, y: 310, w: 46, h: 46, vx: 0, vy: 0, onGround: false, facing: 1 };
+const gravity = 0.65;
+
+// الأشكال الهندسية للقفز عليها
+const shapes = [
+  { x: 0, y: 380, w: 900, h: 40, type: 'ground', color: '#3a5a40' },
+  { x: 140, y: 295, w: 120, h: 24, type: 'rect', color: '#f4a261' },
+  { x: 340, y: 230, w: 110, h: 24, type: 'circlePad', color: '#e76f51' },
+  { x: 530, y: 175, w: 125, h: 24, type: 'trianglePad', color: '#2a9d8f' },
+  { x: 720, y: 265, w: 120, h: 24, type: 'diamondPad', color: '#e9c46a' },
+  { x: 220, y: 140, w: 115, h: 24, type: 'rect', color: '#9b5de5' }
+];
+
+let banana = { x: 375, y: 185, r: 20, active: true };
+
+function shuffle(arr) {
+  const a = [...arr];
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+}
+
+function placeBanana() {
+  const pads = shapes.slice(1);
+  const pad = pads[Math.floor(Math.random() * pads.length)];
+  banana.x = pad.x + pad.w / 2;
+  banana.y = pad.y - 28;
+  banana.active = true;
+}
+
+function initGame() {
+  gameQueue = shuffle(questionsBank);
+  currentQIndex = 0;
+  score = 0;
+  collectedFruits = [];
+  monkey.x = 60; monkey.y = 310; monkey.vx = 0; monkey.vy = 0;
+  updateHUD();
+  placeBanana();
+  gamePaused = false;
+}
+
+function updateHUD() {
+  document.getElementById('q-counter').textContent = currentQIndex;
+  document.getElementById('score-val').textContent = score;
+  document.getElementById('fruits-tray').textContent = collectedFruits.slice(-8).join(' ');
+}
+
+window.addEventListener('keydown', e => {
+  if (e.code === 'ArrowLeft') keys.left = true;
+  if (e.code === 'ArrowRight') keys.right = true;
+  if (e.code === 'ArrowUp' || e.code === 'Space') jump();
+});
+window.addEventListener('keyup', e => {
+  if (e.code === 'ArrowLeft') keys.left = false;
+  if (e.code === 'ArrowRight') keys.right = false;
+});
+
+function jump() {
+  if (gamePaused) return;
+  if (monkey.onGround) {
+    monkey.vy = -13.5;
+    monkey.onGround = false;
+    playJumpSound();
+  }
+}
+
+function updatePhysics() {
+  if (gamePaused) return;
+
+  if (keys.left) { monkey.vx = -5; monkey.facing = -1; }
+  else if (keys.right) { monkey.vx = 5; monkey.facing = 1; }
+  else { monkey.vx *= 0.8; }
+
+  monkey.vy += gravity;
+  monkey.x += monkey.vx;
+  monkey.y += monkey.vy;
+
+  if (monkey.x < 10) monkey.x = 10;
+  if (monkey.x + monkey.w > canvas.width - 10) monkey.x = canvas.width - monkey.w - 10;
+
+  monkey.onGround = false;
+  for (const s of shapes) {
+    if (
+      monkey.vy >= 0 &&
+      monkey.x + monkey.w - 8 > s.x &&
+      monkey.x + 8 < s.x + s.w &&
+      monkey.y + monkey.h >= s.y &&
+      monkey.y + monkey.h <= s.y + s.h + 14
+    ) {
+      monkey.y = s.y - monkey.h;
+      monkey.vy = 0;
+      monkey.onGround = true;
+    }
+  }
+
+  // فحص التقاط الموزة
+  if (banana.active) {
+    const dx = (monkey.x + monkey.w / 2) - banana.x;
+    const dy = (monkey.y + monkey.h / 2) - banana.y;
+    if (Math.hypot(dx, dy) < 38) {
+      banana.active = false;
+      triggerQuestion();
+    }
+  }
+}
+
+function drawScene() {
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+  // رسم أشجار الغابة الخلفية
+  ctx.fillStyle = 'rgba(20, 50, 35, 0.45)';
+  [90, 280, 480, 690, 840].forEach(tx => {
+    ctx.fillRect(tx, 80, 26, 300);
+    ctx.beginPath(); ctx.arc(tx + 13, 80, 55, 0, Math.PI * 2); ctx.fill();
+  });
+
+  // رسم الأشكال الهندسية
+  shapes.forEach(s => {
+    ctx.fillStyle = s.color;
+    if (s.type === 'ground') {
+      ctx.fillRect(s.x, s.y, s.w, s.h);
+    } else if (s.type === 'rect') {
+      ctx.beginPath(); ctx.roundRect(s.x, s.y, s.w, s.h, 8); ctx.fill();
+    } else if (s.type === 'circlePad') {
+      ctx.beginPath(); ctx.ellipse(s.x + s.w/2, s.y + s.h/2, s.w/2, s.h/1.4, 0, 0, Math.PI*2); ctx.fill();
+    } else if (s.type === 'trianglePad') {
+      ctx.beginPath();
+      ctx.moveTo(s.x, s.y); ctx.lineTo(s.x + s.w, s.y); ctx.lineTo(s.x + s.w/2, s.y + s.h + 12);
+      ctx.closePath(); ctx.fill();
+    } else if (s.type === 'diamondPad') {
+      ctx.beginPath();
+      ctx.moveTo(s.x + s.w/2, s.y - 6); ctx.lineTo(s.x + s.w, s.y + s.h/2);
+      ctx.lineTo(s.x + s.w/2, s.y + s.h + 6); ctx.lineTo(s.x, s.y + s.h/2);
+      ctx.closePath(); ctx.fill();
+    }
+  });
+
+  // رسم الموزة
+  if (banana.active) {
+    ctx.font = '36px serif';
+    ctx.textAlign = 'center';
+    ctx.fillText('🍌', banana.x, banana.y + 12);
+  }
+
+  // رسم القرد
+  ctx.font = '42px serif';
+  ctx.textAlign = 'center';
+  ctx.fillText('🐒', monkey.x + monkey.w / 2, monkey.y + 38);
+}
+
+function gameLoop() {
+  updatePhysics();
+  drawScene();
+  requestAnimationFrame(gameLoop);
+}
+
+// ================= 4. نظام الأسئلة والمؤقت (20 ثانية) والمكافآت =================
+function triggerQuestion() {
+  if (currentQIndex >= gameQueue.length) {
+    openLeaderboard();
+    return;
+  }
+  gamePaused = true;
+  keys.left = false; keys.right = false;
+
+  const qObj = gameQueue[currentQIndex];
+  document.getElementById('question-view').style.display = 'block';
+  document.getElementById('feedback-view').style.display = 'none';
+  document.getElementById('q-modal').style.display = 'flex';
+
+  document.getElementById('q-level').textContent = `المستوى: ${qObj.lvl}`;
+  document.getElementById('q-tense').textContent = `الزمن: ${qObj.tense}`;
+  document.getElementById('q-text').textContent = `${currentQIndex + 1}. ${qObj.q}`;
+
+  const optsDiv = document.getElementById('q-options');
+  optsDiv.innerHTML = '';
+  qObj.opts.forEach((optText, idx) => {
+    const btn = document.createElement('button');
+    btn.className = 'opt-btn';
+    btn.textContent = optText;
+    btn.onclick = () => checkAnswer(idx);
+    optsDiv.appendChild(btn);
+  });
+
+  startTimer();
+}
+
+function startTimer() {
+  clearInterval(timerInterval);
+  timeLeft = 20;
+  updateTimerUI();
+  timerInterval = setInterval(() => {
+    timeLeft--;
+    updateTimerUI();
+    if (timeLeft <= 0) {
+      clearInterval(timerInterval);
+      checkAnswer(-1); // انتهاء الوقت
+    }
+  }, 1000);
+}
+
+function updateTimerUI() {
+  document.getElementById('q-timer-text').textContent = `⏱️ ${timeLeft} ثانية`;
+  const fill = document.getElementById('timer-fill');
+  fill.style.width = `${(timeLeft / 20) * 100}%`;
+  fill.style.background = timeLeft <= 6 ? '#e63946' : '#2a9d8f';
+}
+
+const goodFruits = [
+  { icon: '🍎', name: 'تفاح' },
+  { icon: '🥭', name: 'مانجو' },
+  { icon: '🍐', name: 'كمثرى' },
+  { icon: '🍉', name: 'بطيخ' },
+  { icon: '🍇', name: 'عنب' }
+];
+
+function checkAnswer(selectedIdx) {
+  clearInterval(timerInterval);
+  const qObj = gameQueue[currentQIndex];
+  const isCorrect = selectedIdx === qObj.ans;
+
+  document.getElementById('question-view').style.display = 'none';
+  document.getElementById('feedback-view').style.display = 'block';
+  const titleEl = document.getElementById('fb-title');
+  const reactEl = document.getElementById('fb-reaction');
+  const hintEl = document.getElementById('fb-hint');
+  const nextBtn = document.getElementById('next-btn');
+  const modalBox = document.getElementById('q-modal-box');
+
+  modalBox.classList.remove('shake');
+
+  if (isCorrect) {
+    playWinSound();
+    const bonus = Math.max(5, timeLeft);
+    score += 10 + bonus;
+    titleEl.style.color = '#2a9d8f';
+    titleEl.textContent = `🎉 إجابة صحيحة! (+${10 + bonus} نقطة) — القرد يهديك صندوق مفاجآت!`;
+    hintEl.style.display = 'none';
+    nextBtn.style.display = 'none';
+    reactEl.innerHTML = `
+      <p>اضغط على صندوق الهدية لفتحه واكتشاف الفاكهة 🎁👇</p>
+      <div class="big-emoji" id="gift-box">🎁</div>
+    `;
+    document.getElementById('gift-box').onclick = function() {
+      const fruit = goodFruits[Math.floor(Math.random() * goodFruits.length)];
+      collectedFruits.push(fruit.icon);
+      updateHUD();
+      playWinSound();
+      reactEl.innerHTML = `<div class="big-emoji">${fruit.icon}</div><p>رائع! حصلت على <strong>${fruit.name}</strong> طازج!</p>`;
+      nextBtn.style.display = 'inline-block';
+    };
+  } else {
+    playMonkeyScream(); // صراخ القرد العالي عند الخطأ
+    void modalBox.offsetWidth;
+    modalBox.classList.add('shake');
+
+    titleEl.style.color = '#e63946';
+    titleEl.textContent = selectedIdx === -1 ? '⏰ انتهى الوقت! القرد يصرخ غاضباً!' : '❌ إجابة خاطئة! القرد يصرخ بصوت عالٍ!';
+    hintEl.style.display = 'block';
+    hintEl.innerHTML = `💡 <strong>تلميح القاعدة:</strong> ${qObj.hint}<br>✅ الإجابة الصحيحة هي: <strong>${qObj.opts[qObj.ans]}</strong>`;
+
+    // حركات القرد الطريفة أو صندوق المفاجآت المرعب
+    const prankType = Math.floor(Math.random() * 4);
+    if (prankType === 0) {
+      reactEl.innerHTML = `<div class="big-emoji">🐒👅</div><p>القرد يخرج لسانه ساخراً من الإجابة الخاطئة!</p>`;
+      nextBtn.style.display = 'inline-block';
+    } else if (prankType === 1) {
+      reactEl.innerHTML = `<div class="big-emoji">🐒👋💥</div><p>آوتش! القرد أعطاك لطمة طريفة للتنبيه!</p>`;
+      nextBtn.style.display = 'inline-block';
+    } else {
+      const creature = prankType === 2 ? { icon: '🕷️', name: 'عنكبوت مخيف' } : { icon: '🐍', name: 'ثعبان الغابة' };
+      nextBtn.style.display = 'none';
+      reactEl.innerHTML = `<p>أعطاك القرد صندوقاً غامضاً.. اضغط لفتحه بحذر! 📦👇</p><div class="big-emoji" id="trap-box">📦</div>`;
+      document.getElementById('trap-box').onclick = function() {
+        playMonkeyScream();
+        reactEl.innerHTML = `<div class="big-emoji">${creature.icon}</div><p>يا إلهي! خرج من الصندوق <strong>${creature.name}</strong>!</p>`;
+        nextBtn.style.display = 'inline-block';
+      };
+    }
+  }
+
+  currentQIndex++;
+  updateHUD();
+}
+
+function closeQuestionModal() {
+  document.getElementById('q-modal').style.display = 'none';
+  if (currentQIndex >= gameQueue.length) {
+    alert(`أحسنت! أتممت جميع الـ 50 سؤالاً بنجاح ومجموع نقاطك ${score}! سجل اسمك الآن في لوحة الشرف.`);
+    openLeaderboard();
+  } else {
+    placeBanana();
+    gamePaused = false;
+  }
+}
+
+// ================= 5. لوحة الشرف (Leaderboard) =================
+let leaderboard = JSON.parse(localStorage.getItem('monkey_tenses_lb') || '[]');
+
+function openLeaderboard() {
+  gamePaused = true;
+  renderLeaderboard();
+  document.getElementById('lb-modal').style.display = 'flex';
+}
+
+function closeLeaderboard() {
+  document.getElementById('lb-modal').style.display = 'none';
+  if (currentQIndex < gameQueue.length) gamePaused = false;
+}
+
+function saveScore() {
+  const nameInput = document.getElementById('player-name');
+  const name = nameInput.value.trim();
+  if (!name) return alert('الرجاء كتابة اسم الطالب أولاً!');
+  leaderboard.push({ name, score, answered: currentQIndex });
+  leaderboard.sort((a, b) => b.score - a.score);
+  leaderboard = leaderboard.slice(0, 10);
+  localStorage.setItem('monkey_tenses_lb', JSON.stringify(leaderboard));
+  nameInput.value = '';
+  renderLeaderboard();
+}
+
+function renderLeaderboard() {
+  const tbody = document.getElementById('lb-body');
+  tbody.innerHTML = '';
+  if (leaderboard.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="4">لا توجد نتائج مسجلة بعد. كن أول المتصدرين! 🌟</td></tr>';
+    return;
+  }
+  leaderboard.forEach((entry, i) => {
+    const medal = i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : `${i + 1}`;
+    tbody.innerHTML += `<tr><td>${medal}</td><td>${entry.name}</td><td>${entry.score}</td><td>${entry.answered} / 50</td></tr>`;
+  });
+}
+
+function resetGame() {
+  closeLeaderboard();
+  initGame();
+}
+
+// تشغيل اللعبة عند التحميل
+initGame();
+requestAnimationFrame(gameLoop);
+</script>
+</body>
+</html>
